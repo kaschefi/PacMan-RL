@@ -20,30 +20,34 @@ namespace MusicHandler
                 Destroy(this);
             else
                 Instance = this;
+
+            _audioSource = GetComponent<AudioSource>();
         }
 
         private void Start()
         {
-            _audioSource = GetComponent<AudioSource>();
+            if (_audioSource == null)
+                _audioSource = GetComponent<AudioSource>();
         }
 
         public void PlayGhostChase()
         {
-            if (_audioSource.isPlaying) return;
+            if (_audioSource == null || _audioSource.isPlaying) return;
             _audioSource.clip = ghostChase;
             _audioSource.Play();
         }
 
         public void PlayPacmanChase()
         {
-            if (_audioSource.isPlaying) return;
+            if (_audioSource == null || _audioSource.isPlaying) return;
             _audioSource.clip = pacmanChase;
             _audioSource.Play();
         }
 
         public void StopMusic()
         {
-            _audioSource.Stop();
+            if (_audioSource != null)
+                _audioSource.Stop();
         }
 
         public void TogglePause()

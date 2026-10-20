@@ -36,9 +36,15 @@ namespace Player
 
         public Vector2 NextDestination { get; set; }
 
-        private void Start()
+        private void Awake()
         {
             _rigidbody2D = GetComponent<Rigidbody2D>();
+            _spawnPosition = transform.position;
+        }
+
+        private void Start()
+        {
+            if (_rigidbody2D == null) _rigidbody2D = GetComponent<Rigidbody2D>();
             var position = transform.position;
             _spawnPosition = position;
             _lastDirection = initDirection.normalized;
@@ -103,6 +109,18 @@ namespace Player
             _lastInputDirection = initDirection.normalized;
             _lastDirection = initDirection.normalized;
             RotateRenderer();
+
+            if (animator != null)
+            {
+                animator.enabled = true;
+                animator.SetBool(AnimationsConstants.PlayerIsMoving, false);
+                animator.SetBool(AnimationsConstants.PlayerIsDead, false);
+            }
+
+            if (spriteRenderer != null)
+                spriteRenderer.enabled = true;
+
+            enabled = true;
         }
 
         public void Immobilize()

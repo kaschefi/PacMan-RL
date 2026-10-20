@@ -18,18 +18,20 @@ namespace GameHandler
 
         private void Start()
         {
+            enabled = false;
+
             StartAudioSource = GetComponent<AudioSource>();
-            StartAudioSource.Play();
+            if (StartAudioSource != null)
+                StartAudioSource.Play();
+
+            // In RL: Activate ghosts and player immediately in 0.0s without waiting for intro music to finish
+            if (GameHandler.Instance != null)
+                GameHandler.Instance.ActivateGhostsAndPlayer();
         }
 
         private void Update()
         {
-            if (StartAudioSource.isPlaying || IsStarterPaused)
-                return;
-
-            GameHandler.Instance.ActivateGhostsAndPlayer();
-
-            enabled = false;
+            // No-op in RL mode: Update was only used to wait for StartAudioSource to finish playing
         }
 
         public void TogglePause()

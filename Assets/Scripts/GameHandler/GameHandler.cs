@@ -1,4 +1,6 @@
+using System;
 using System.Collections;
+using Collectibles;
 using Door;
 using GamePauseUi;
 using Ghosts;
@@ -15,6 +17,10 @@ namespace GameHandler
         // Singleton
         public static GameHandler Instance { get; private set; }
 
+        // Events for RL Agent (1 Death = 1 Episode)
+        public event Action OnPlayerDied;
+        public event Action OnBoardCleared;
+
         // Current Game Mode
         public GhostMode GameGhostsMode { get; private set; }
 
@@ -24,8 +30,11 @@ namespace GameHandler
         // Player
         private PlayerController _player;
 
-        // Pac-gum
+        // Pac-gum and Collectibles
         private int _pacGumCount;
+        private CollectiblePacGum[] _allPacGums;
+        private CollectiblePower[] _allPowerPellets;
+        private int _totalPacGumCount;
 
         // Timer for scatter and chase
         public uint[] ghostsModeTimes = { 7, 20, 7, 20, 5, 20, 5 };
@@ -34,6 +43,7 @@ namespace GameHandler
         private bool _allTimersPaused;
 
         // Timer for ghost frightened
+        public bool IsFrightenedMode => _switcherModeTimerPaused;
         public uint frightenedTime = 10;
         private float _frightenTimer;
         private bool _switcherModeTimerPaused;
@@ -57,13 +67,32 @@ namespace GameHandler
 
 
         #region Awake Singleton
-
+ 
         private void Awake()
         {
             if (Instance != null && Instance != this)
+            {
                 Destroy(this);
-            else
-                Instance = this;
+                return;
+            }
+            Instance = this;
+            EnsureInitialized();
+        }
+
+        public void EnsureInitialized()
+        {
+            if (_ghosts == null || _ghosts.Length == 0)
+                _ghosts = FindObjectsOfType<GhostAiMovement>(true);
+            if (_player == null)
+                _player = FindObjectOfType<PlayerController>(true);
+            if (_allPacGums == null || _allPacGums.Length == 0)
+            {
+                _allPacGums = FindObjectsOfType<CollectiblePacGum>(true);
+                _totalPacGumCount = _allPacGums != null ? _allPacGums.Length : 0;
+                _pacGumCount = _totalPacGumCount;
+            }
+            if (_allPowerPellets == null || _allPowerPellets.Length == 0)
+                _allPowerPellets = FindObjectsOfType<CollectiblePower>(true);
         }
 
         #endregion
@@ -72,19 +101,18 @@ namespace GameHandler
 
         private void Start()
         {
-            _ghosts = FindObjectsOfType<GhostAiMovement>();
-            _player = FindObjectOfType<PlayerController>();
-            winText.enabled = false;
-            gamePausedText.enabled = false;
-            _pacGumCount = GameObject.FindGameObjectsWithTag(TagsConstants.PacGumTag).Length;
+            EnsureInitialized();
+            if (winText != null) winText.enabled = false;
+            if (gamePausedText != null) gamePausedText.enabled = false;
+            if (gameOverText != null) gameOverText.enabled = false;
             UpdateGhostsMode();
-            gamePauseUiHandler.Reset();
-            pauseMenuUi.SetActive(false);
+            if (gamePauseUiHandler != null) gamePauseUiHandler.Reset();
+            if (pauseMenuUi != null) pauseMenuUi.SetActive(false);
         }
 
         private void Update()
         {
-            if (GameStartHandler.Instance.enabled || _allTimersPaused)
+            if ((GameStartHandler.Instance != null && GameStartHandler.Instance.enabled) || _allTimersPaused)
                 return;
 
             if (!_switcherModeTimerPaused)
@@ -116,13 +144,13 @@ namespace GameHandler
             }
             else
             {
-                // Update the timer and check if it's time to end the frighten mode.
+                // Update the timer and check if it's time to end the frighten mode (10 seconds)
                 _frightenTimer += Time.deltaTime;
                 if (_frightenTimer >= frightenedTime)
                 {
                     _frightenTimer = 0;
                     _switcherModeTimerPaused = false;
-                    doorHandler.CloseDoor();
+                    if (doorHandler != null) doorHandler.CloseDoor();
                     UpdateGhostsMode();
                 }
 
@@ -141,10 +169,13 @@ namespace GameHandler
             else
                 SwitchingScatterMode();
 
-            if (!GameStartHandler.Instance.enabled)
+            if (GameStartHandler.Instance == null || !GameStartHandler.Instance.enabled)
             {
-                MusicHandler.MusicHandler.Instance.StopMusic();
-                MusicHandler.MusicHandler.Instance.PlayGhostChase();
+                if (MusicHandler.MusicHandler.Instance != null)
+                {
+                    MusicHandler.MusicHandler.Instance.StopMusic();
+                    MusicHandler.MusicHandler.Instance.PlayGhostChase();
+                }
             }
         }
 
@@ -165,17 +196,26 @@ namespace GameHandler
         public void SwitchingFrightenedMode()
         {
             GhostCountEaten = 0;
-
-            // Not changing the game mode for eaten ghosts to be able to switch back to the normal current mode.
-            if (_switcherModeTimerPaused)
-                _frightenTimer = 0; // Reset the timer if the ghosts are already in frightened mode.
-
+            _frightenTimer = 0; // Reset the 10-second timer
             _switcherModeTimerPaused = true;
-            foreach (var ghost in _ghosts) ghost.SetGhostMode(GhostMode.Frightened);
-            doorHandler.OpenDoor();
 
-            MusicHandler.MusicHandler.Instance.StopMusic();
-            MusicHandler.MusicHandler.Instance.PlayPacmanChase();
+            if (_ghosts != null)
+            {
+                foreach (var ghost in _ghosts)
+                {
+                    if (ghost != null)
+                        ghost.SetGhostMode(GhostMode.Frightened);
+                }
+            }
+
+            if (doorHandler != null)
+                doorHandler.OpenDoor();
+
+            if (MusicHandler.MusicHandler.Instance != null)
+            {
+                MusicHandler.MusicHandler.Instance.StopMusic();
+                MusicHandler.MusicHandler.Instance.PlayPacmanChase();
+            }
         }
 
         #endregion
@@ -184,6 +224,8 @@ namespace GameHandler
 
         private void PrintCurrentMode()
         {
+            if (currentModeText == null) return;
+
             // If we are in the last mode, which is chase mode.
             // or if the last mode in the array is chase mode then we are in final chase mode.
             if (_ghostsModeTimesIndex >= ghostsModeTimes.Length ||
@@ -200,7 +242,8 @@ namespace GameHandler
 
         private void PrintFrightenMode()
         {
-            currentModeText.text = $"Frighten for {frightenedTime - _frightenTimer:F2}s";
+            if (currentModeText != null)
+                currentModeText.text = $"Frighten for {Mathf.Max(0, frightenedTime - _frightenTimer):F2}s";
         }
 
         #endregion
@@ -210,75 +253,177 @@ namespace GameHandler
         public void KillPlayer()
         {
             // Stop music
-            MusicHandler.MusicHandler.Instance.StopMusic();
+            if (MusicHandler.MusicHandler.Instance != null)
+                MusicHandler.MusicHandler.Instance.StopMusic();
 
             // Reset the player destination
-            _player.Immobilize();
+            if (_player != null)
+                _player.Immobilize();
 
             // Reset the ghost mode.
             _allTimersPaused = true;
 
             // Deactivate the ghosts
-            foreach (var ghost in _ghosts)
+            if (_ghosts != null)
             {
-                ghost.gameObject.SetActive(false);
-                ghost.bodyRenderer.enabled = true;
+                foreach (var ghost in _ghosts)
+                {
+                    if (ghost != null)
+                    {
+                        ghost.gameObject.SetActive(false);
+                        if (ghost.bodyRenderer != null) ghost.bodyRenderer.enabled = true;
+                    }
+                }
             }
 
             // Exit frighten timer
             _switcherModeTimerPaused = false;
 
-            // Decrease the lives and handle the player death.
-            if (FindObjectOfType<PlayerLife>().Kill())
+            // In RL: 1 Death = 1 Episode (Lives system is disabled)
+            var playerLife = FindObjectOfType<PlayerLife>();
+            if (playerLife != null)
             {
-                ScoreHandler.ScoreHandler.Instance.UpdateHighScore();
-                gameOverText.enabled = true;
+                playerLife.Kill();
+            }
 
-                // Restart the game after 3 seconds.
-                Invoke(nameof(RestartGame), 3);
-            }
-            else // If the player still has lives.
-            {
-                Invoke(nameof(ResetGhostsAndPlayer), 3);
-            }
+            if (ScoreHandler.ScoreHandler.Instance != null)
+                ScoreHandler.ScoreHandler.Instance.UpdateHighScore();
+
+            // Trigger death event for RL agent (EndEpisode + negative reward)
+            OnPlayerDied?.Invoke();
+
+            // In RL: Reset entire board (all pellets + all ghosts) fresh in 0.0s (no 3s Invoke wait)
+            ResetBoard();
         }
 
-        private void ResetGhostsAndPlayer()
+        public void ResetGhostsAndPlayer()
         {
-            // Reset the ghosts
-            foreach (var ghost in _ghosts)
+            // In RL: 1 Death = 1 Episode, so reset the entire board
+            ResetBoard();
+        }
+
+        /// <summary>
+        /// Resets the entire board (all pellets + all ghosts + player + mode timers + score) fresh in 0.0 seconds.
+        /// Can be called directly or from RL Agent's OnEpisodeBegin().
+        /// </summary>
+        public void ResetBoard()
+        {
+            EnsureInitialized();
+
+            // Cancel any pending invokes
+            CancelInvoke();
+
+            // Reset ghosts mode timers
+            _ghostsModeTimesIndex = 0;
+            _switcherModeTimer = 0f;
+            _frightenTimer = 0f;
+            _switcherModeTimerPaused = false;
+            _allTimersPaused = false;
+            GhostCountEaten = 0;
+
+            // Reset UI
+            if (gameOverText != null) gameOverText.enabled = false;
+            if (winText != null) winText.enabled = false;
+
+            // Reset all pellets (pac-gums and power pellets)
+            if (_allPacGums != null)
             {
-                ghost.gameObject.SetActive(true);
-                ghost.Reset();
+                foreach (var pacGum in _allPacGums)
+                {
+                    if (pacGum != null) pacGum.ResetPellet();
+                }
             }
 
-            // Reset the player
-            _player.enabled = true;
-            _player.GetComponent<PlayerController>().enabled = true;
-            _player.Reset();
-            _player.gameObject.SetActive(true);
+            if (_allPowerPellets != null)
+            {
+                foreach (var power in _allPowerPellets)
+                {
+                    if (power != null) power.ResetPellet();
+                }
+            }
 
-            // Play the music
-            MusicHandler.MusicHandler.Instance.PlayGhostChase();
+            _pacGumCount = _totalPacGumCount;
 
-            // // Reset the ghost mode.
-            _allTimersPaused = false;
+            // Reset ghosts
+            if (_ghosts != null)
+            {
+                foreach (var ghost in _ghosts)
+                {
+                    if (ghost != null)
+                    {
+                        ghost.gameObject.SetActive(true);
+                        ghost.enabled = true;
+                        if (ghost.bodyAnimator != null) ghost.bodyAnimator.enabled = true;
+                        ghost.Reset();
+                    }
+                }
+            }
+
+            // Reset player
+            if (_player != null)
+            {
+                _player.gameObject.SetActive(true);
+                _player.enabled = true;
+                if (_player.animator != null)
+                {
+                    _player.animator.enabled = true;
+                    _player.animator.SetBool(AnimationsConstants.PlayerIsDead, false);
+                    _player.animator.SetBool(AnimationsConstants.PlayerIsMoving, false);
+                }
+                _player.Reset();
+            }
+
+            // Reset player life state
+            var playerLife = FindObjectOfType<PlayerLife>();
+            if (playerLife != null)
+            {
+                playerLife.ResetLife();
+            }
+
+            // Reset door
+            if (doorHandler != null)
+            {
+                doorHandler.CloseDoor();
+            }
+
+            // Reset score for the new episode
+            if (ScoreHandler.ScoreHandler.Instance != null)
+            {
+                ScoreHandler.ScoreHandler.Instance.ResetScore();
+            }
+
+            // Play music if available
+            if (MusicHandler.MusicHandler.Instance != null)
+            {
+                MusicHandler.MusicHandler.Instance.PlayGhostChase();
+            }
+
+            // Update ghosts mode
+            UpdateGhostsMode();
         }
 
         public void ActivateGhostsAndPlayer()
         {
             foreach (var ghost in _ghosts)
             {
-                ghost.bodyAnimator.enabled = true;
-                ghost.enabled = true;
+                if (ghost != null)
+                {
+                    if (ghost.bodyAnimator != null) ghost.bodyAnimator.enabled = true;
+                    ghost.enabled = true;
+                }
             }
 
-            _player.enabled = true;
-            _player.animator.enabled = true;
+            if (_player != null)
+            {
+                _player.enabled = true;
+                if (_player.animator != null) _player.animator.enabled = true;
+            }
 
-            doorHandler.CloseDoor();
+            if (doorHandler != null)
+                doorHandler.CloseDoor();
 
-            MusicHandler.MusicHandler.Instance.PlayGhostChase();
+            if (MusicHandler.MusicHandler.Instance != null)
+                MusicHandler.MusicHandler.Instance.PlayGhostChase();
         }
 
         public void RestartGame()
@@ -296,19 +441,9 @@ namespace GameHandler
 
         private void NextLevel()
         {
-            _allTimersPaused = true;
-
-            winText.enabled = true;
-
-            foreach (var ghost in _ghosts) ghost.gameObject.SetActive(false);
-
-            _player.enabled = false;
-            _player.animator.enabled = false;
-
-            MusicHandler.MusicHandler.Instance.StopMusic();
-            MusicHandler.MusicHandler.Instance.PlayIntermission();
-
-            Invoke(nameof(RestartGame), 6);
+            // In RL: Level cleared = episode success. Reset fresh in 0.0s (no 6s wait timer)
+            OnBoardCleared?.Invoke();
+            ResetBoard();
         }
 
         public void TogglePause()

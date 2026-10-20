@@ -13,8 +13,8 @@ namespace Player
         public Sprite heartTexture;
         public Vector3 heartSpriteScale = new(1f, 1f);
 
-        // Lives
-        public int life = 3;
+        // Lives: in RL mode, 1 Death = 1 Episode. Lives system is disabled.
+        public int life = 1;
 
         // Hearts display properties
         public GameObject heartsParent;
@@ -32,8 +32,9 @@ namespace Player
             // Set respawn point
             _respawnPoint = transform.position;
 
-            // Create hearts UI sprites
-            GenerateHearts();
+            // In RL: Hide hearts UI since lives system is disabled
+            if (heartsParent != null)
+                heartsParent.SetActive(false);
 
             // Get death audio
             _deathAudio = GetComponent<AudioSource>();
@@ -41,6 +42,7 @@ namespace Player
 
         private void GenerateHearts()
         {
+            if (heartsParent == null) return;
             _hearts = new GameObject[life];
 
             for (var i = 0; i < life; i++)
@@ -57,13 +59,21 @@ namespace Player
 
         public bool Kill()
         {
-            _deathAudio.Play();
-            life--;
-            _hearts[life].SetActive(false);
-            GetComponent<PlayerController>().enabled = false;
-            anim.SetBool(IsDead, true);
-            Invoke(nameof(DisableGameObject), 2f);
-            return life <= 0;
+            if (_deathAudio != null)
+                _deathAudio.Play();
+
+            life = 0;
+            CancelInvoke();
+
+            // In RL: 1 Death = 1 Episode. No 2-second wait timer (Invoke removed).
+            // Reset happens instantly in 0.0 seconds.
+            return true;
+        }
+
+        public void ResetLife()
+        {
+            life = 1;
+            CancelInvoke();
         }
 
         private void DisableGameObject()

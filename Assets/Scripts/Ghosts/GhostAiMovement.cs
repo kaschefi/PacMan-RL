@@ -77,12 +77,20 @@ namespace Ghosts
         public GhostScoreDisplayer ghostScoreDisplayer;
 
 
+        private void Awake()
+        {
+            _rigidbody2D = GetComponent<Rigidbody2D>();
+            _spawnPoint = transform.position;
+            if (bodyAnimator == null) bodyAnimator = GetComponentInChildren<Animator>();
+        }
+
         private void Start()
         {
             var pos = transform.position;
 
             // Get components
-            _rigidbody2D = GetComponent<Rigidbody2D>();
+            if (_rigidbody2D == null) _rigidbody2D = GetComponent<Rigidbody2D>();
+            if (bodyAnimator == null) bodyAnimator = GetComponentInChildren<Animator>();
 
             // Set spawn point
             _spawnPoint = pos;
@@ -92,10 +100,10 @@ namespace Ghosts
             NextTileDestination = (Vector2)pos + initDirection;
 
             // Set initial mode
-            if (isInGhostHouse) _ghostMode = GhostMode.LeavingHouse;
-
-            // Body animation
-            bodyAnimator = GetComponent<Animator>();
+            if (isInGhostHouse)
+                _ghostMode = GhostMode.LeavingHouse;
+            else
+                _ghostMode = GhostMode.Scatter;
         }
 
         private void FixedUpdate()
@@ -143,17 +151,20 @@ namespace Ghosts
             {
                 case GhostMode.Scatter:
                 case GhostMode.Chase:
+                    if (bodyRenderer != null) bodyRenderer.enabled = true;
+                    if (eyesSpriteRenderer != null) eyesSpriteRenderer.enabled = true;
                     UpdateNormalMoveRunAnimation();
                     break;
                 case GhostMode.Frightened:
                     UpdateFrightenedAnimation();
-                    MusicHandler.MusicHandler.Instance.PlayPacmanChase();
+                    if (MusicHandler.MusicHandler.Instance != null)
+                        MusicHandler.MusicHandler.Instance.PlayPacmanChase();
                     break;
                 case GhostMode.Eaten:
                     StartCoroutine(GhostEatenPause());
                     break;
                 case GhostMode.LeavingHouse:
-                    bodyRenderer.enabled = true;
+                    if (bodyRenderer != null) bodyRenderer.enabled = true;
                     break;
                 default:
                     // Debug.LogError("Invalid Ghost Mode at 'SetGhostMode'");
@@ -466,19 +477,27 @@ namespace Ghosts
         {
             eyesSpriteRenderer.enabled = false;
             bodyRenderer.enabled = false;
-            ghostScoreDisplayer.DisplayGhostScore();
-            ScoreHandler.ScoreHandler.Instance.AddScore(scoreValues[
-                GameHandler.GameHandler.Instance.GhostCountEaten++]);
+            if (ghostScoreDisplayer != null)
+                ghostScoreDisplayer.DisplayGhostScore();
+
+            var scoreIndex = Mathf.Clamp(
+                GameHandler.GameHandler.Instance != null ? GameHandler.GameHandler.Instance.GhostCountEaten++ : 0,
+                0,
+                scoreValues.Length - 1);
+
+            if (ScoreHandler.ScoreHandler.Instance != null)
+                ScoreHandler.ScoreHandler.Instance.AddScore(scoreValues[scoreIndex]);
+
             PlayEatenAudio();
-            Time.timeScale = 0;
-            Time.fixedDeltaTime = 0;
-            yield return new WaitForSecondsRealtime(GhostPauseEatenTime);
-            Time.timeScale = TimeConstants.TimeScaleNormal;
-            Time.fixedDeltaTime = TimeConstants.FixedDeltaTime;
-            ghostScoreDisplayer.HideGhostScore();
+
+            // In RL: Remove 0.6s wait timer (WaitForSecondsRealtime). Transition immediately in 0.0s.
+            if (ghostScoreDisplayer != null)
+                ghostScoreDisplayer.HideGhostScore();
+
             UpdateNormalMoveEatenAnimation();
             eyesSpriteRenderer.enabled = true;
             PlayGoHomeAudio();
+            yield break;
         }
 
         #endregion
@@ -486,9 +505,26 @@ namespace Ghosts
         public void Reset()
         {
             transform.position = _spawnPoint;
-            if (isInGhostHouse) _ghostMode = GhostMode.LeavingHouse;
-
+            _direction = initDirection.normalized;
             NextTileDestination = (Vector2)transform.position + initDirection;
+
+            if (isInGhostHouse)
+                _ghostMode = GhostMode.LeavingHouse;
+            else
+                _ghostMode = GhostMode.Scatter;
+
+            _hasChangedMode = false;
+            _currentWayPointDestinationIndex = 0;
+            _ghostHomeReached = false;
+
+            if (bodyRenderer != null) bodyRenderer.enabled = true;
+            if (eyesSpriteRenderer != null) eyesSpriteRenderer.enabled = true;
+            if (bodyAnimator != null) bodyAnimator.enabled = true;
+
+            if (goHomeAudioSource != null && goHomeAudioSource.isPlaying) goHomeAudioSource.Stop();
+            if (eatenAudioSource != null && eatenAudioSource.isPlaying) eatenAudioSource.Stop();
+
+            UpdateNormalMoveRunAnimation();
         }
     }
 }

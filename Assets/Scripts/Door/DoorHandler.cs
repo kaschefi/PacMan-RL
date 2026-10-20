@@ -15,22 +15,22 @@ namespace Door
 
         private void Start()
         {
-            Invoke(nameof(OpenDoor), 4f);
+            // In RL: Open the door immediately without 4s delay
+            OpenDoor();
         }
 
         public void OpenDoor()
         {
-            anim.SetBool(AnimationsConstants.DoorIsOpen, true);
+            CancelInvoke();
+            if (anim != null)
+                anim.SetBool(AnimationsConstants.DoorIsOpen, true);
         }
 
         public void CloseDoor()
         {
-            Invoke(nameof(CloseDoorInvoke), 1.0f);
-        }
-
-        private void CloseDoorInvoke()
-        {
-            anim.SetBool(AnimationsConstants.DoorIsOpen, false);
+            CancelInvoke();
+            if (anim != null)
+                anim.SetBool(AnimationsConstants.DoorIsOpen, false);
         }
     }
 }
