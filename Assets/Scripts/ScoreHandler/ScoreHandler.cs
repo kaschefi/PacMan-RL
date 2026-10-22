@@ -14,37 +14,43 @@ namespace ScoreHandler
 
         private AudioSource _audioSource;
 
+        public int CurrentScore => _score;
+
         private void Awake()
         {
-            if (Instance != null && Instance != this)
-                Destroy(this);
-            else
+            if (Instance == null)
                 Instance = this;
         }
 
         private void Start()
         {
             _audioSource = GetComponent<AudioSource>();
-            scoreText.SetText("Score: " + _score);
-            highScoreText.SetText("High Score: " + PlayerPrefs.GetInt(highScoreKey));
+            if (scoreText != null)
+                scoreText.SetText("Score: " + _score);
+            if (highScoreText != null)
+                highScoreText.SetText("High Score: " + PlayerPrefs.GetInt(highScoreKey));
         }
 
         public void ResetScore()
         {
             _score = 0;
-            scoreText.SetText("Score: " + _score);
+            if (scoreText != null)
+                scoreText.SetText("Score: " + _score);
         }
 
         public void AddScore(int score)
         {
             _score += score;
-            scoreText.SetText("Score: " + _score);
+            if (scoreText != null)
+                scoreText.SetText("Score: " + _score);
+
             if (_score > PlayerPrefs.GetInt(highScoreKey))
             {
                 PlayerPrefs.SetInt(highScoreKey, _score);
-                highScoreText.SetText("High Score: " + _score);
+                if (highScoreText != null)
+                    highScoreText.SetText("High Score: " + _score);
 
-                if (!_reachHighScore)
+                if (!_reachHighScore && _audioSource != null)
                     _audioSource.Play();
                 _reachHighScore = true;
             }

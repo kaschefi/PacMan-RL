@@ -11,16 +11,35 @@ namespace LevelInputHandler
         public PlayerController playerController;
         public GamePauseUiHandler gamePauseUiHandler;
         public SettingsController.SettingsController settingsController;
+        [SerializeField] private GameHandler.GameHandler gameHandler;
+
+        private void Start()
+        {
+            Transform areaRoot = PacManArea.FindAreaRoot(transform);
+            Transform searchRoot = areaRoot != null ? areaRoot : (transform.parent != null ? transform.parent : transform);
+
+            if (gameHandler == null)
+                gameHandler = searchRoot.GetComponentInChildren<GameHandler.GameHandler>(true) ?? GetComponentInParent<GameHandler.GameHandler>() ?? GameHandler.GameHandler.Instance;
+            if (playerController == null)
+                playerController = searchRoot.GetComponentInChildren<PlayerController>(true);
+        }
 
         private void OnCancel()
         {
-            if (GameStartHandler.Instance.enabled)
+            if (GameStartHandler.Instance != null && GameStartHandler.Instance.enabled)
                 GameStartHandler.Instance.TogglePause();
-            GameHandler.GameHandler.Instance.TogglePause();
-            MusicHandler.MusicHandler.Instance.TogglePause();
 
-            gamePauseUiHandler.ResetInitialButton();
-            settingsController.ResetSliderSelection();
+            var gh = gameHandler != null ? gameHandler : GameHandler.GameHandler.Instance;
+            if (gh != null)
+                gh.TogglePause();
+
+            if (MusicHandler.MusicHandler.Instance != null)
+                MusicHandler.MusicHandler.Instance.TogglePause();
+
+            if (gamePauseUiHandler != null)
+                gamePauseUiHandler.ResetInitialButton();
+            if (settingsController != null)
+                settingsController.ResetSliderSelection();
         }
 
         private void OnMove(InputValue value)

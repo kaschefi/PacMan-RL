@@ -24,7 +24,10 @@ namespace Player
 
         // Init spawn position and direction
         public Vector2 initDirection = Vector2.left / 2;
-        private Vector2 _spawnPosition;
+
+        [Header("Spawn Settings (Local Coordinates)")]
+        [SerializeField] private Vector3 _spawnLocalPosition;
+        private bool _hasInitializedSpawn;
 
         // Player direction
         private Vector2 _lastInputDirection;
@@ -39,16 +42,31 @@ namespace Player
         private void Awake()
         {
             _rigidbody2D = GetComponent<Rigidbody2D>();
-            _spawnPosition = transform.position;
+            if (!_hasInitializedSpawn)
+            {
+                _spawnLocalPosition = transform.localPosition;
+                _hasInitializedSpawn = true;
+            }
         }
 
         private void Start()
         {
             if (_rigidbody2D == null) _rigidbody2D = GetComponent<Rigidbody2D>();
-            var position = transform.position;
-            _spawnPosition = position;
+            if (tilemap == null)
+            {
+                Transform areaRoot = PacManArea.FindAreaRoot(transform);
+                Transform searchRoot = areaRoot != null ? areaRoot : (transform.parent != null ? transform.parent : transform);
+                tilemap = searchRoot.GetComponentInChildren<Tilemap>(true) ?? (transform.parent == null ? FindFirstObjectByType<Tilemap>(FindObjectsInactive.Include) : null);
+            }
+
+            if (!_hasInitializedSpawn)
+            {
+                _spawnLocalPosition = transform.localPosition;
+                _hasInitializedSpawn = true;
+            }
+
             _lastDirection = initDirection.normalized;
-            NextDestination = (Vector2)position + _lastDirection / 2;
+            NextDestination = (Vector2)transform.position + _lastDirection / 2;
             RotateRenderer();
         }
 
@@ -94,6 +112,7 @@ namespace Player
 
         private bool DetectWallBorder(Vector2 dir)
         {
+            if (tilemap == null) return false;
             // Detect a tile in the direction of the dir vector parameter
             var pos = (Vector2)transform.position;
             var cellPosition = tilemap.WorldToCell(pos + dir);
@@ -104,8 +123,14 @@ namespace Player
 
         public void Reset()
         {
-            transform.position = _spawnPosition;
-            NextDestination = _spawnPosition + initDirection;
+            transform.localPosition = _spawnLocalPosition;
+            if (_rigidbody2D != null)
+            {
+                _rigidbody2D.linearVelocity = Vector2.zero;
+                _rigidbody2D.position = transform.position;
+            }
+
+            NextDestination = (Vector2)transform.position + initDirection;
             _lastInputDirection = initDirection.normalized;
             _lastDirection = initDirection.normalized;
             RotateRenderer();

@@ -10,13 +10,29 @@ namespace Teleporter
 
         private void OnTriggerEnter2D(Collider2D other)
         {
-            other.GetComponent<Transform>().position = target.GetComponent<Transform>().position;
+            if (target == null) return;
+
+            var targetPos = target.transform.position;
+            other.transform.position = targetPos;
+
+            var rb = other.GetComponent<Rigidbody2D>();
+            if (rb != null)
+            {
+                rb.position = targetPos;
+            }
 
             if (other.gameObject.CompareTag(TagsConstants.PlayerTag))
-                other.gameObject.GetComponent<PlayerController>().NextDestination = target.transform.position;
+            {
+                var pc = other.gameObject.GetComponent<PlayerController>();
+                if (pc != null)
+                    pc.NextDestination = targetPos;
+            }
             else if (other.gameObject.CompareTag(TagsConstants.EnemyTag))
-                other.gameObject.GetComponent<GhostAiMovement>()
-                    .NextTileDestination = target.transform.position;
+            {
+                var ghost = other.gameObject.GetComponent<GhostAiMovement>();
+                if (ghost != null)
+                    ghost.NextTileDestination = targetPos;
+            }
         }
     }
 }

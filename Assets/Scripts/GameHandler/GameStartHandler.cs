@@ -8,11 +8,11 @@ namespace GameHandler
         public AudioSource StartAudioSource { get; private set; }
         public bool IsStarterPaused { get; private set; }
 
+        [SerializeField] private GameHandler gameHandler;
+
         private void Awake()
         {
-            if (Instance != null && Instance != this)
-                Destroy(this);
-            else
+            if (Instance == null)
                 Instance = this;
         }
 
@@ -24,9 +24,16 @@ namespace GameHandler
             if (StartAudioSource != null)
                 StartAudioSource.Play();
 
+            if (gameHandler == null)
+            {
+                Transform areaRoot = PacManArea.FindAreaRoot(transform);
+                Transform searchRoot = areaRoot != null ? areaRoot : (transform.parent != null ? transform.parent : transform);
+                gameHandler = searchRoot.GetComponentInChildren<GameHandler>(true) ?? GetComponentInParent<GameHandler>() ?? GameHandler.Instance;
+            }
+
             // In RL: Activate ghosts and player immediately in 0.0s without waiting for intro music to finish
-            if (GameHandler.Instance != null)
-                GameHandler.Instance.ActivateGhostsAndPlayer();
+            if (gameHandler != null)
+                gameHandler.ActivateGhostsAndPlayer();
         }
 
         private void Update()
@@ -36,10 +43,13 @@ namespace GameHandler
 
         public void TogglePause()
         {
-            if (StartAudioSource.isPlaying)
-                StartAudioSource.Pause();
-            else
-                StartAudioSource.Play();
+            if (StartAudioSource != null)
+            {
+                if (StartAudioSource.isPlaying)
+                    StartAudioSource.Pause();
+                else
+                    StartAudioSource.Play();
+            }
 
             IsStarterPaused = !IsStarterPaused;
         }

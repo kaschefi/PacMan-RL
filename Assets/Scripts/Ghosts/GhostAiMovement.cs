@@ -29,6 +29,10 @@ namespace Ghosts
         public Tilemap tilemap;
 
         // Ghost target variables
+        [Header("Local Area References (Auto-resolved if null)")]
+        [SerializeField] protected GameHandler.GameHandler gameHandler;
+        [SerializeField] protected global::ScoreHandler.ScoreHandler scoreHandler;
+
         public GameObject chaseModeTarget;
         public GameObject scatterModeTarget;
 
@@ -57,7 +61,9 @@ namespace Ghosts
         private int _currentWayPointDestinationIndex;
 
         // Ghost spawn
-        private Vector3 _spawnPoint;
+        [Header("Spawn Settings (Local Coordinates)")]
+        [SerializeField] private Vector3 _spawnLocalPoint;
+        private bool _hasInitializedSpawn;
 
         // Body animator
         public Animator bodyAnimator;
@@ -80,8 +86,13 @@ namespace Ghosts
         private void Awake()
         {
             _rigidbody2D = GetComponent<Rigidbody2D>();
-            _spawnPoint = transform.position;
+            if (!_hasInitializedSpawn)
+            {
+                _spawnLocalPoint = transform.localPosition;
+                _hasInitializedSpawn = true;
+            }
             if (bodyAnimator == null) bodyAnimator = GetComponentInChildren<Animator>();
+            ResolveDependencies();
         }
 
         private void Start()
@@ -92,8 +103,13 @@ namespace Ghosts
             if (_rigidbody2D == null) _rigidbody2D = GetComponent<Rigidbody2D>();
             if (bodyAnimator == null) bodyAnimator = GetComponentInChildren<Animator>();
 
-            // Set spawn point
-            _spawnPoint = pos;
+            ResolveDependencies();
+
+            if (!_hasInitializedSpawn)
+            {
+                _spawnLocalPoint = transform.localPosition;
+                _hasInitializedSpawn = true;
+            }
 
             // Set initial direction
             _direction = initDirection;
@@ -104,6 +120,50 @@ namespace Ghosts
                 _ghostMode = GhostMode.LeavingHouse;
             else
                 _ghostMode = GhostMode.Scatter;
+        }
+
+        public virtual void ResolveDependencies(GameHandler.GameHandler gh = null, global::ScoreHandler.ScoreHandler sh = null)
+        {
+            if (gh != null) gameHandler = gh;
+            if (sh != null) scoreHandler = sh;
+
+            Transform areaRoot = PacManArea.FindAreaRoot(transform);
+            Transform searchRoot = areaRoot != null ? areaRoot : (transform.parent != null ? transform.parent : transform);
+
+            if (gameHandler == null)
+            {
+                gameHandler = searchRoot.GetComponentInChildren<GameHandler.GameHandler>(true) ??
+                              GetComponentInParent<GameHandler.GameHandler>() ??
+                              (transform.parent == null ? FindFirstObjectByType<GameHandler.GameHandler>(FindObjectsInactive.Include) : null);
+            }
+
+            if (scoreHandler == null)
+            {
+                scoreHandler = searchRoot.GetComponentInChildren<global::ScoreHandler.ScoreHandler>(true) ??
+                               GetComponentInParent<global::ScoreHandler.ScoreHandler>() ??
+                               (transform.parent == null ? FindFirstObjectByType<global::ScoreHandler.ScoreHandler>(FindObjectsInactive.Include) : null);
+            }
+
+            if (tilemap == null)
+            {
+                tilemap = searchRoot.GetComponentInChildren<Tilemap>(true) ??
+                          (transform.parent == null ? FindFirstObjectByType<Tilemap>(FindObjectsInactive.Include) : null);
+            }
+
+            if (chaseModeTarget == null)
+            {
+                if (gameHandler != null && gameHandler.Player != null)
+                {
+                    chaseModeTarget = gameHandler.Player.gameObject;
+                }
+                else
+                {
+                    var player = searchRoot.GetComponentInChildren<Player.PlayerController>(true) ??
+                                 (transform.parent == null ? FindFirstObjectByType<Player.PlayerController>(FindObjectsInactive.Include) : null);
+                    if (player != null)
+                        chaseModeTarget = player.gameObject;
+                }
+            }
         }
 
         private void FixedUpdate()
@@ -467,10 +527,19 @@ namespace Ghosts
         private void OnTriggerEnter2D(Collider2D other)
         {
             if (other.CompareTag(TagsConstants.PlayerTag))
+            {
                 if (_ghostMode is GhostMode.Frightened or GhostMode.Eaten)
+                {
                     SetGhostMode(GhostMode.Eaten);
+                }
                 else
-                    GameHandler.GameHandler.Instance.KillPlayer();
+                {
+                    if (gameHandler == null) ResolveDependencies();
+                    var gh = gameHandler != null ? gameHandler : GameHandler.GameHandler.Instance;
+                    if (gh != null)
+                        gh.KillPlayer();
+                }
+            }
         }
 
         private IEnumerator GhostEatenPause()
@@ -480,13 +549,16 @@ namespace Ghosts
             if (ghostScoreDisplayer != null)
                 ghostScoreDisplayer.DisplayGhostScore();
 
+            var gh = gameHandler != null ? gameHandler : GameHandler.GameHandler.Instance;
+            var sh = scoreHandler != null ? scoreHandler : global::ScoreHandler.ScoreHandler.Instance;
+
             var scoreIndex = Mathf.Clamp(
-                GameHandler.GameHandler.Instance != null ? GameHandler.GameHandler.Instance.GhostCountEaten++ : 0,
+                gh != null ? gh.GhostCountEaten++ : 0,
                 0,
                 scoreValues.Length - 1);
 
-            if (ScoreHandler.ScoreHandler.Instance != null)
-                ScoreHandler.ScoreHandler.Instance.AddScore(scoreValues[scoreIndex]);
+            if (sh != null)
+                sh.AddScore(scoreValues[scoreIndex]);
 
             PlayEatenAudio();
 
@@ -504,7 +576,13 @@ namespace Ghosts
 
         public void Reset()
         {
-            transform.position = _spawnPoint;
+            transform.localPosition = _spawnLocalPoint;
+            if (_rigidbody2D != null)
+            {
+                _rigidbody2D.linearVelocity = Vector2.zero;
+                _rigidbody2D.position = transform.position;
+            }
+
             _direction = initDirection.normalized;
             NextTileDestination = (Vector2)transform.position + initDirection;
 

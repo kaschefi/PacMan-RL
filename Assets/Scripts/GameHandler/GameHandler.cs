@@ -25,10 +25,17 @@ namespace GameHandler
         public GhostMode GameGhostsMode { get; private set; }
 
         // Ghosts
-        private GhostAiMovement[] _ghosts;
+        [Header("Local Area References (Auto-resolved if null)")]
+        [SerializeField] private GhostAiMovement[] _ghosts;
 
         // Player
-        private PlayerController _player;
+        [SerializeField] private PlayerController _player;
+        [SerializeField] private PlayerLife _playerLife;
+        [SerializeField] private global::ScoreHandler.ScoreHandler _scoreHandler;
+
+        public PlayerController Player => _player;
+        public GhostAiMovement[] Ghosts => _ghosts;
+        public global::ScoreHandler.ScoreHandler AreaScoreHandler => _scoreHandler;
 
         // Pac-gum and Collectibles
         private int _pacGumCount;
@@ -66,33 +73,89 @@ namespace GameHandler
         public int GhostCountEaten { get; set; }
 
 
-        #region Awake Singleton
+        #region Awake & Local Initialization
  
         private void Awake()
         {
-            if (Instance != null && Instance != this)
+            if (Instance == null)
             {
-                Destroy(this);
-                return;
+                Instance = this;
             }
-            Instance = this;
             EnsureInitialized();
         }
 
         public void EnsureInitialized()
         {
+            Transform areaRoot = PacManArea.FindAreaRoot(transform);
+            Transform searchRoot = areaRoot != null ? areaRoot : (transform.parent != null ? transform.parent : transform);
+
             if (_ghosts == null || _ghosts.Length == 0)
-                _ghosts = FindObjectsOfType<GhostAiMovement>(true);
+            {
+                _ghosts = searchRoot.GetComponentsInChildren<GhostAiMovement>(true);
+                if ((_ghosts == null || _ghosts.Length == 0) && transform.parent == null)
+                    _ghosts = FindObjectsByType<GhostAiMovement>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            }
+
             if (_player == null)
-                _player = FindObjectOfType<PlayerController>(true);
+            {
+                _player = searchRoot.GetComponentInChildren<PlayerController>(true);
+                if (_player == null && transform.parent == null)
+                    _player = FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
+            }
+
+            if (_playerLife == null)
+            {
+                _playerLife = searchRoot.GetComponentInChildren<PlayerLife>(true);
+                if (_playerLife == null && transform.parent == null)
+                    _playerLife = FindFirstObjectByType<PlayerLife>(FindObjectsInactive.Include);
+            }
+
+            if (_scoreHandler == null)
+            {
+                _scoreHandler = searchRoot.GetComponentInChildren<global::ScoreHandler.ScoreHandler>(true);
+                if (_scoreHandler == null && transform.parent == null)
+                    _scoreHandler = FindFirstObjectByType<global::ScoreHandler.ScoreHandler>(FindObjectsInactive.Include);
+            }
+
+            if (doorHandler == null)
+            {
+                doorHandler = searchRoot.GetComponentInChildren<DoorHandler>(true);
+                if (doorHandler == null && transform.parent == null)
+                    doorHandler = FindFirstObjectByType<DoorHandler>(FindObjectsInactive.Include);
+            }
+
             if (_allPacGums == null || _allPacGums.Length == 0)
             {
-                _allPacGums = FindObjectsOfType<CollectiblePacGum>(true);
+                _allPacGums = searchRoot.GetComponentsInChildren<CollectiblePacGum>(true);
+                if ((_allPacGums == null || _allPacGums.Length == 0) && transform.parent == null)
+                    _allPacGums = FindObjectsByType<CollectiblePacGum>(FindObjectsInactive.Include, FindObjectsSortMode.None);
                 _totalPacGumCount = _allPacGums != null ? _allPacGums.Length : 0;
                 _pacGumCount = _totalPacGumCount;
             }
+
             if (_allPowerPellets == null || _allPowerPellets.Length == 0)
-                _allPowerPellets = FindObjectsOfType<CollectiblePower>(true);
+            {
+                _allPowerPellets = searchRoot.GetComponentsInChildren<CollectiblePower>(true);
+                if ((_allPowerPellets == null || _allPowerPellets.Length == 0) && transform.parent == null)
+                    _allPowerPellets = FindObjectsByType<CollectiblePower>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            }
+
+            // Propagate local references directly to all pellets and ghosts in this area
+            if (_allPacGums != null)
+            {
+                foreach (var gum in _allPacGums)
+                    if (gum != null) gum.ResolveDependencies(this, _scoreHandler);
+            }
+            if (_allPowerPellets != null)
+            {
+                foreach (var power in _allPowerPellets)
+                    if (power != null) power.ResolveDependencies(this, _scoreHandler);
+            }
+            if (_ghosts != null)
+            {
+                foreach (var ghost in _ghosts)
+                    if (ghost != null) ghost.ResolveDependencies(this, _scoreHandler);
+            }
         }
 
         #endregion
@@ -280,14 +343,14 @@ namespace GameHandler
             _switcherModeTimerPaused = false;
 
             // In RL: 1 Death = 1 Episode (Lives system is disabled)
-            var playerLife = FindObjectOfType<PlayerLife>();
-            if (playerLife != null)
+            if (_playerLife != null)
             {
-                playerLife.Kill();
+                _playerLife.Kill();
             }
 
-            if (ScoreHandler.ScoreHandler.Instance != null)
-                ScoreHandler.ScoreHandler.Instance.UpdateHighScore();
+            var sh = _scoreHandler != null ? _scoreHandler : global::ScoreHandler.ScoreHandler.Instance;
+            if (sh != null)
+                sh.UpdateHighScore();
 
             // Trigger death event for RL agent (EndEpisode + negative reward)
             OnPlayerDied?.Invoke();
@@ -374,10 +437,9 @@ namespace GameHandler
             }
 
             // Reset player life state
-            var playerLife = FindObjectOfType<PlayerLife>();
-            if (playerLife != null)
+            if (_playerLife != null)
             {
-                playerLife.ResetLife();
+                _playerLife.ResetLife();
             }
 
             // Reset door
@@ -387,9 +449,10 @@ namespace GameHandler
             }
 
             // Reset score for the new episode
-            if (ScoreHandler.ScoreHandler.Instance != null)
+            var resetScoreHandler = _scoreHandler != null ? _scoreHandler : global::ScoreHandler.ScoreHandler.Instance;
+            if (resetScoreHandler != null)
             {
-                ScoreHandler.ScoreHandler.Instance.ResetScore();
+                resetScoreHandler.ResetScore();
             }
 
             // Play music if available

@@ -4,6 +4,7 @@ namespace Ghosts
     {
         protected override void Chase()
         {
+            if (chaseModeTarget == null) return;
             ChaseTarget(chaseModeTarget, runSpeed);
         }
     }

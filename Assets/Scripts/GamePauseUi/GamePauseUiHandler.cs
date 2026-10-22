@@ -15,6 +15,8 @@ namespace GamePauseUi
 
         public GameObject settingsPanel;
 
+        [SerializeField] private GameHandler.GameHandler gameHandler;
+
         private int _curentButtonIndex = 0;
         private Vector2 _inputDirection;
 
@@ -22,6 +24,13 @@ namespace GamePauseUi
 
         private void Start()
         {
+            if (gameHandler == null)
+            {
+                Transform areaRoot = GameHandler.PacManArea.FindAreaRoot(transform);
+                Transform searchRoot = areaRoot != null ? areaRoot : (transform.parent != null ? transform.parent : transform);
+                gameHandler = searchRoot.GetComponentInChildren<GameHandler.GameHandler>(true) ?? GetComponentInParent<GameHandler.GameHandler>() ?? GameHandler.GameHandler.Instance;
+            }
+
             resumeButton.onClick.AddListener(ResumeGame);
             quitButton.onClick.AddListener(QuitGame);
             settingsButton.onClick.AddListener(SettingsGame);
@@ -98,15 +107,22 @@ namespace GamePauseUi
 
         private void ResumeGame()
         {
-            if (GameStartHandler.Instance.enabled)
+            if (GameStartHandler.Instance != null && GameStartHandler.Instance.enabled)
                 GameStartHandler.Instance.TogglePause();
-            GameHandler.GameHandler.Instance.TogglePause();
-            MusicHandler.MusicHandler.Instance.TogglePause();
+
+            var gh = gameHandler != null ? gameHandler : GameHandler.GameHandler.Instance;
+            if (gh != null)
+                gh.TogglePause();
+
+            if (MusicHandler.MusicHandler.Instance != null)
+                MusicHandler.MusicHandler.Instance.TogglePause();
         }
 
         private void QuitGame()
         {
-            GameHandler.GameHandler.Instance.GoToMainMenu();
+            var gh = gameHandler != null ? gameHandler : GameHandler.GameHandler.Instance;
+            if (gh != null)
+                gh.GoToMainMenu();
         }
 
         private void SettingsGame()
@@ -123,7 +139,9 @@ namespace GamePauseUi
 
         private void RestartGame()
         {
-            GameHandler.GameHandler.Instance.RestartGame();
+            var gh = gameHandler != null ? gameHandler : GameHandler.GameHandler.Instance;
+            if (gh != null)
+                gh.RestartGame();
         }
     }
 }

@@ -16,9 +16,7 @@ namespace MusicHandler
 
         private void Awake()
         {
-            if (Instance != null && Instance != this)
-                Destroy(this);
-            else
+            if (Instance == null)
                 Instance = this;
 
             _audioSource = GetComponent<AudioSource>();

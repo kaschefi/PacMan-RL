@@ -22,7 +22,8 @@ namespace Player
         private GameObject[] _hearts;
 
         // Respawn coordinates
-        private Vector2 _respawnPoint;
+        [Header("Respawn Settings (Local Coordinates)")]
+        [SerializeField] private Vector3 _respawnLocalPoint;
 
         // Death audio
         private AudioSource _deathAudio;
@@ -30,7 +31,7 @@ namespace Player
         private void Start()
         {
             // Set respawn point
-            _respawnPoint = transform.position;
+            _respawnLocalPoint = transform.localPosition;
 
             // In RL: Hide hearts UI since lives system is disabled
             if (heartsParent != null)

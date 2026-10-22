@@ -11,10 +11,12 @@ namespace Ghosts
 
         protected override void Chase()
         {
-            ChaseTarget(
-                Vector2.Distance(transform.position, chaseModeTarget.transform.position) >= 8f
-                    ? chaseModeTarget
-                    : scatterModeTarget, runSpeed);
+            if (chaseModeTarget == null) return;
+            var target =
+                scatterModeTarget != null && Vector2.Distance(transform.position, chaseModeTarget.transform.position) < 8f
+                    ? scatterModeTarget
+                    : chaseModeTarget;
+            ChaseTarget(target, runSpeed);
         }
 
         // protected override void Chase()
