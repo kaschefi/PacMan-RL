@@ -1,0 +1,32 @@
+{
+    "num_ghosts": {
+        "lesson_num": 0
+    },
+    "PacmanAgent": {
+        "checkpoints": [
+            {
+                "steps": 18022,
+                "file_path": "results\\pacman_ppo_run1\\PacmanAgent\\PacmanAgent-18022.onnx",
+                "reward": -9.0315072773134,
+                "creation_time": 1792765141.4064662,
+                "auxillary_file_paths": [
+                    "results\\pacman_ppo_run1\\PacmanAgent\\PacmanAgent-18022.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 18022,
+            "file_path": "results\\pacman_ppo_run1\\PacmanAgent.onnx",
+            "reward": -9.0315072773134,
+            "creation_time": 1792765141.4064662,
+            "auxillary_file_paths": [
+                "results\\pacman_ppo_run1\\PacmanAgent\\PacmanAgent-18022.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.2.0.dev0",
+        "torch_version": "2.2.2+cu121"
+    }
+}
