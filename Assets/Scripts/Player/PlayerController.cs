@@ -33,6 +33,9 @@ namespace Player
         private Vector2 _lastInputDirection;
         private Vector2 _lastDirection;
 
+        public Vector2 LastDirection => _lastDirection;
+        public bool CanMoveDirection(Vector2 dir) => !DetectWallBorder(dir);
+
         // Sprite
         public SpriteRenderer spriteRenderer;
 

@@ -48,6 +48,7 @@ namespace Ghosts
         // Ghost current mode
         public Vector2 NextTileDestination { get; set; }
         private GhostMode _ghostMode;
+        public GhostMode CurrentMode => _ghostMode;
         private bool _hasChangedMode;
 
         // Components
@@ -559,6 +560,9 @@ namespace Ghosts
 
             if (sh != null)
                 sh.AddScore(scoreValues[scoreIndex]);
+
+            if (gh != null)
+                gh.NotifyGhostEaten(scoreValues[scoreIndex]);
 
             PlayEatenAudio();
 

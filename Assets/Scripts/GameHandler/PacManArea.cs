@@ -26,8 +26,16 @@ namespace GameHandler
         public Vector2 areaDimensions = new Vector2(32f, 38f);
         public Color gizmoColor = new Color(0f, 0.8f, 1f, 0.35f);
 
+        private CollectiblePacGum[] _allPacGums;
+        private CollectiblePower[] _allPowerPellets;
+
         private void Awake()
         {
+            if (Application.isBatchMode)
+            {
+                AudioListener.pause = true;
+                AudioListener.volume = 0f;
+            }
             InitializeArea();
         }
 
@@ -83,12 +91,12 @@ namespace GameHandler
                 gameHandler.EnsureInitialized();
 
             // Inject local dependencies directly to all pellets and ghosts
-            var pellets = GetComponentsInChildren<CollectiblePacGum>(true);
-            foreach (var pellet in pellets)
+            _allPacGums = GetComponentsInChildren<CollectiblePacGum>(true);
+            foreach (var pellet in _allPacGums)
                 pellet.ResolveDependencies(gameHandler, scoreHandler);
 
-            var powerPellets = GetComponentsInChildren<CollectiblePower>(true);
-            foreach (var power in powerPellets)
+            _allPowerPellets = GetComponentsInChildren<CollectiblePower>(true);
+            foreach (var power in _allPowerPellets)
                 power.ResolveDependencies(gameHandler, scoreHandler);
 
             if (ghosts != null)
@@ -111,6 +119,79 @@ namespace GameHandler
             {
                 gameHandler.ResetBoard();
             }
+
+            // Immediately synchronize 2D Box2D physics transforms to prevent frame-0 tunneling
+            Physics2D.SyncTransforms();
+        }
+
+        /// <summary>
+        /// Sets the number of active ghosts for Curriculum Learning lessons.
+        /// </summary>
+        public void SetActiveGhostCount(int count)
+        {
+            if (ghosts == null) return;
+            int clamped = Mathf.Clamp(count, 0, ghosts.Length);
+            for (int i = 0; i < ghosts.Length; i++)
+            {
+                if (ghosts[i] != null)
+                {
+                    bool active = i < clamped;
+                    ghosts[i].gameObject.SetActive(active);
+                    ghosts[i].enabled = active;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Calculates the relative vector from Pac-Man's local position to the nearest active pellet.
+        /// </summary>
+        public Vector2 GetRelativeVectorToNearestPellet(Vector3 agentLocalPosition)
+        {
+            Vector2 bestDelta = Vector2.zero;
+            float minSqrDist = float.MaxValue;
+            if (_allPacGums == null) return bestDelta;
+
+            for (int i = 0; i < _allPacGums.Length; i++)
+            {
+                var pellet = _allPacGums[i];
+                if (pellet != null && pellet.gameObject.activeSelf)
+                {
+                    Vector2 delta = (Vector2)(pellet.transform.localPosition - agentLocalPosition);
+                    float sqrDist = delta.sqrMagnitude;
+                    if (sqrDist < minSqrDist)
+                    {
+                        minSqrDist = sqrDist;
+                        bestDelta = delta;
+                    }
+                }
+            }
+            return bestDelta;
+        }
+
+        /// <summary>
+        /// Calculates the relative vector from Pac-Man's local position to the nearest active power pellet (energizer).
+        /// </summary>
+        public Vector2 GetRelativeVectorToNearestEnergizer(Vector3 agentLocalPosition)
+        {
+            Vector2 bestDelta = Vector2.zero;
+            float minSqrDist = float.MaxValue;
+            if (_allPowerPellets == null) return bestDelta;
+
+            for (int i = 0; i < _allPowerPellets.Length; i++)
+            {
+                var power = _allPowerPellets[i];
+                if (power != null && power.gameObject.activeSelf)
+                {
+                    Vector2 delta = (Vector2)(power.transform.localPosition - agentLocalPosition);
+                    float sqrDist = delta.sqrMagnitude;
+                    if (sqrDist < minSqrDist)
+                    {
+                        minSqrDist = sqrDist;
+                        bestDelta = delta;
+                    }
+                }
+            }
+            return bestDelta;
         }
 
         private void OnDrawGizmosSelected()

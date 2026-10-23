@@ -16,6 +16,8 @@ namespace Collectibles
 
         private void Awake()
         {
+            if (CompareTag("Untagged"))
+                tag = TagsConstants.EnergizerTag;
             _spriteRenderer = GetComponent<SpriteRenderer>();
             _collider2D = GetComponent<Collider2D>();
             ResolveDependencies();

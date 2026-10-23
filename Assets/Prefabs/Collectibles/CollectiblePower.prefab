@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 2593082357038616140}
   m_Layer: 0
   m_Name: CollectiblePower
-  m_TagString: Untagged
+  m_TagString: Energizer
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0

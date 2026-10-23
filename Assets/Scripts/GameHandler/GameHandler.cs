@@ -20,6 +20,9 @@ namespace GameHandler
         // Events for RL Agent (1 Death = 1 Episode)
         public event Action OnPlayerDied;
         public event Action OnBoardCleared;
+        public event Action<int> OnPelletEaten;
+        public event Action<int> OnEnergizerEaten;
+        public event Action<int> OnGhostEaten;
 
         // Current Game Mode
         public GhostMode GameGhostsMode { get; private set; }
@@ -42,6 +45,13 @@ namespace GameHandler
         private CollectiblePacGum[] _allPacGums;
         private CollectiblePower[] _allPowerPellets;
         private int _totalPacGumCount;
+
+        public int PelletCount => _pacGumCount;
+        public int TotalPelletCount => _totalPacGumCount;
+        public float FrightenedTimerRemaining => Mathf.Max(0f, frightenedTime - _frightenTimer);
+        public float FrightenedTimeTotal => frightenedTime;
+        public CollectiblePacGum[] AllPacGums => _allPacGums;
+        public CollectiblePower[] AllPowerPellets => _allPowerPellets;
 
         // Timer for scatter and chase
         public uint[] ghostsModeTimes = { 7, 20, 7, 20, 5, 20, 5 };
@@ -258,6 +268,7 @@ namespace GameHandler
 
         public void SwitchingFrightenedMode()
         {
+            OnEnergizerEaten?.Invoke(100);
             GhostCountEaten = 0;
             _frightenTimer = 0; // Reset the 10-second timer
             _switcherModeTimerPaused = true;
@@ -499,7 +510,13 @@ namespace GameHandler
         public void DecrementPacGumNumber()
         {
             _pacGumCount--;
+            OnPelletEaten?.Invoke(10);
             if (_pacGumCount <= 0) NextLevel();
+        }
+
+        public void NotifyGhostEaten(int score)
+        {
+            OnGhostEaten?.Invoke(score);
         }
 
         private void NextLevel()

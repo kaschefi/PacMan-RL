@@ -196,3 +196,56 @@ Automated diagnostic tool accessible via **`Tools > PacMan RL > Run Parallel Pre
    - Eat a pellet in Maze #1: Only Maze #1 score increments.
    - Touch a ghost in Maze #2: Pac-Man #2 resets inside Maze #2 (no teleportation to Maze #1).
    - Both mazes run simultaneously without cross-talk.
+
+---
+
+## 7. Step 3: ML-Agents Package Integration & Event-Driven Episode Lifecycle (Step 1 Deliverable)
+
+### Modifications Implemented:
+1. **Unity Package Manifest**:
+   - Added `"com.unity.ml-agents": "3.0.0"` to [`Packages/manifest.json`](file:///c:/Unity/PacMan-RL/Packages/manifest.json).
+2. **Tag & Sensing Sanitization**:
+   - Added `Energizer` tag to [`TagManager.asset`](file:///c:/Unity/PacMan-RL/ProjectSettings/TagManager.asset) and [`TagsConstants.cs`](file:///c:/Unity/PacMan-RL/Assets/Scripts/TagsConstants.cs).
+   - Configured `CollectiblePower.prefab` to use tag `Energizer` (with fallback assignment in `CollectiblePower.cs`).
+3. **Decoupled Event Hooks for RL Rewards**:
+   - Added `OnPelletEaten`, `OnEnergizerEaten`, and `OnGhostEaten` events in [`GameHandler.cs`](file:///c:/Unity/PacMan-RL/Assets/Scripts/GameHandler/GameHandler.cs).
+   - `GhostAiMovement.cs` calls `NotifyGhostEaten()` directly upon being consumed.
+4. **Physics Transform Synchronization & State Accessors**:
+   - Added `Physics2D.SyncTransforms()` inside [`PacManArea.ResetArea()`](file:///c:/Unity/PacMan-RL/Assets/Scripts/GameHandler/PacManArea.cs) to eliminate Box2D frame-0 tunneling.
+   - Added `GetRelativeVectorToNearestPellet()` and `GetRelativeVectorToNearestEnergizer()` inside `PacManArea.cs`.
+   - Added `SetActiveGhostCount(int count)` for curriculum learning.
+   - Exposed `LastDirection` and `CanMoveDirection(Vector2 dir)` in [`PlayerController.cs`](file:///c:/Unity/PacMan-RL/Assets/Scripts/Player/PlayerController.cs).
+   - Exposed `CurrentMode` in [`GhostAiMovement.cs`](file:///c:/Unity/PacMan-RL/Assets/Scripts/Ghosts/GhostAiMovement.cs).
+5. **Headless Execution Optimization**:
+   - Added batch-mode audio suspension in `PacManArea.Awake()` (`AudioListener.pause = true`, `AudioListener.volume = 0f`).
+
+---
+
+## 8. Step 4: Agent Architecture Implementation (`PacmanAgent.cs`)
+
+### Components Implemented:
+1. **`PacmanAgent.cs` (`Assets/Scripts/Player/PacmanAgent.cs`)**:
+   - Inherits from `Unity.MLAgents.Agent`.
+   - **Discrete Action Space**: 1 branch of size 4 (0: Up, 1: Right, 2: Down, 3: Left) dispatched to `PlayerController.SetInputDirection()`.
+   - **Vector Observation Space (28 floats)**:
+     - 2 floats: Pac-Man current direction (`LastDirection.x`, `LastDirection.y`).
+     - 4 floats: Wall open/blocked flags in 4 cardinal directions (`CanMoveDirection(dir)`).
+     - 2 floats: Normalized vector to nearest pellet (`GetRelativeVectorToNearestPellet`).
+     - 2 floats: Normalized vector to nearest energizer (`GetRelativeVectorToNearestEnergizer`).
+     - 16 floats: 4 ghosts $\times$ 4 state features `[Relative X / 32, Relative Y / 38, Normalized Distance, IsFrightened]`.
+     - 2 floats: Frightened mode timer remaining fraction + total pellets remaining fraction.
+   - **Reward Shaping**:
+     - Pellet consumed: `+0.10`
+     - Energizer consumed: `+0.50`
+     - Frightened ghost eaten: `+1.50`
+     - Terminal win (board cleared): `+15.00`
+     - Terminal loss (caught by ghost): `-10.00`
+     - Existential step penalty: `-0.0005`
+     - Invalid wall collision move: `-0.005`
+   - **Curriculum Learning**: Automatically queries `Academy.Instance.EnvironmentParameters.GetWithDefault("num_ghosts", 4.0f)` on episode begin.
+   - **Heuristic Mode**: WASD and Arrow key fallback for manual human play verification.
+2. **Editor 1-Click Tooling**:
+   - Added `Tools > PacMan RL > Attach RL Agent & Sensors to Player` in `MazeAreaGridGenerator.cs`.
+   - Added automated Test 6 in `ParallelPrefabTester.cs` auditing agent component configuration.
+
+

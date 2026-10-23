@@ -21,6 +21,86 @@ namespace Editor
             window.Show();
         }
 
+        [MenuItem("Tools/PacMan RL/Resolve Packages")]
+        public static void ResolvePackages()
+        {
+            UnityEditor.PackageManager.Client.Resolve();
+            Debug.Log("[PacMan RL] Triggered Unity Package Manager resolve.");
+        }
+
+        [MenuItem("Tools/PacMan RL/Attach RL Agent & Sensors to Player")]
+        public static void AttachAgentToPlayer()
+        {
+            var players = Object.FindObjectsByType<Player.PlayerController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            if (players.Length == 0)
+            {
+                Debug.LogWarning("[PacMan RL] No PlayerController found in the scene.");
+                return;
+            }
+
+            foreach (var pc in players)
+            {
+                var go = pc.gameObject;
+                pc.enabled = true;
+
+                // 1. Add PacmanAgent
+                var agent = go.GetComponent<Player.PacmanAgent>();
+                if (agent == null)
+                {
+                    agent = go.AddComponent<Player.PacmanAgent>();
+                    Undo.RegisterCreatedObjectUndo(agent, "Add PacmanAgent");
+                }
+
+                // 2. Configure BehaviorParameters
+                var bp = go.GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+                if (bp == null)
+                {
+                    bp = go.AddComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+                    Undo.RegisterCreatedObjectUndo(bp, "Add BehaviorParameters");
+                }
+                bp.BehaviorName = "PacmanAgent";
+                bp.BrainParameters.VectorObservationSize = 28;
+                bp.BrainParameters.NumStackedVectorObservations = 1;
+                bp.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeDiscrete(5);
+
+                // 3. Configure RayPerceptionSensorComponent2D
+                var sensor = go.GetComponent<Unity.MLAgents.Sensors.RayPerceptionSensorComponent2D>();
+                if (sensor == null)
+                {
+                    sensor = go.AddComponent<Unity.MLAgents.Sensors.RayPerceptionSensorComponent2D>();
+                    Undo.RegisterCreatedObjectUndo(sensor, "Add RayPerceptionSensorComponent2D");
+                }
+                sensor.SensorName = "RayPerceptionSensor2D";
+                sensor.DetectableTags = new System.Collections.Generic.List<string>
+                {
+                    TagsConstants.WallBordersTag,
+                    TagsConstants.PacGumTag,
+                    TagsConstants.EnergizerTag,
+                    TagsConstants.EnemyTag,
+                    "Door"
+                };
+                sensor.RaysPerDirection = 4;
+                sensor.MaxRayDegrees = 180f;
+                sensor.SphereCastRadius = 0.25f;
+                sensor.RayLength = 16f;
+                sensor.ObservationStacks = 2;
+
+                // 4. Configure DecisionRequester
+                var dr = go.GetComponent<Unity.MLAgents.DecisionRequester>();
+                if (dr == null)
+                {
+                    dr = go.AddComponent<Unity.MLAgents.DecisionRequester>();
+                    Undo.RegisterCreatedObjectUndo(dr, "Add DecisionRequester");
+                }
+                dr.DecisionPeriod = 5;
+                dr.TakeActionsBetweenDecisions = true;
+
+                EditorUtility.SetDirty(go);
+            }
+
+            Debug.Log($"[PacMan RL] Successfully configured PacmanAgent, BehaviorParameters, DecisionRequester, and RayPerceptionSensor2D on {players.Length} player(s).");
+        }
+
         [MenuItem("Tools/PacMan RL/Frame Camera to All Mazes")]
         public static void FrameCameraToAllMazes()
         {
@@ -163,6 +243,12 @@ namespace Editor
                     SwitchToGridMode();
                 }
                 EditorGUILayout.EndHorizontal();
+            }
+
+            EditorGUILayout.Space();
+            if (GUILayout.Button("Attach PacmanAgent & Sensors to Players", GUILayout.Height(30)))
+            {
+                AttachAgentToPlayer();
             }
         }
 
